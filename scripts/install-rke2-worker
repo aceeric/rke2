@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+#
+# Installs an RKE2 worker node
+# Per: https://docs.rke2.io/install/quickstart/
+#
+
+set -e
+
+if [[ "$#" -ne 2 ]]; then
+  echo "need RKE2 server IP address in arg 1, and RKE2 server token in arg 2"
+  exit 1
+fi
+
+/root/rke2-artifacts/install-rke2-common
+
+echo "creating /etc/rancher/rke2/config.yaml"
+
+mkdir -p /etc/rancher/rke2 && cat <<EOF > /etc/rancher/rke2/config.yaml
+# v1.21.5 does not accept tls-san
+#tls-san:
+#- $(hostname -i)
+server: https://$1:9345
+token: $2
+EOF
+
+echo "running RKE2 install script"
+
+export INSTALL_RKE2_TYPE="agent"
+export INSTALL_RKE2_ARTIFACT_PATH=/root/rke2-artifacts
+
+if sh /root/rke2-artifacts/install.sh; then
+  echo "enabling rke2-agent service"
+  systemctl enable rke2-agent.service && systemctl start rke2-agent.service
+else
+  echo "RKE2 install script failed"
+  exit 1
+fi
+
+echo "Finished."

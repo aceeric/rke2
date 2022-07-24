@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+#
+# Installs an RKE2 server node
+# Per: https://docs.rke2.io/install/quickstart/
+#
+
+set -e
+
+/root/rke2-artifacts/install-rke2-common
+
+echo "creating /etc/rancher/rke2/config.yaml"
+
+# this has the effect of injecting the host IP address into the server cert SAN
+mkdir -p /etc/rancher/rke2 && cat <<EOF >/etc/rancher/rke2/config.yaml
+tls-san:
+- $(hostname -i)
+EOF
+
+echo "running RKE2 install script"
+
+export INSTALL_RKE2_ARTIFACT_PATH=/root/rke2-artifacts
+
+if sh /root/rke2-artifacts/install.sh; then
+  echo "enabling rke2-server service"
+  systemctl enable rke2-server.service && systemctl start rke2-server.service
+else
+  echo "RKE2 install script failed"
+  exit 1
+fi
+
+echo "Finished. To access the RKE2 cluster from outside the VM:"
+echo "scp -i ssh/id_ed25519 root@$(hostname -i):/etc/rancher/rke2/rke2.yaml ~/.kube/rke2-config"
+echo "sed -i 's/127.0.0.1/"$(hostname -i)"/g' ~/.kube/rke2-config"
+echo "export KUBECONFIG=~/.kube/rke2-config"
