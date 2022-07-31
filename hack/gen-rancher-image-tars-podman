@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+#
+# Variation of 'gen-rancher-image-tars-ctr' except uses podman.
+#
+
+set -e
+
+if [[ -z "$1" ]]; then
+  echo "need a path to export to in arg 1"
+  exit 1
+fi
+
+for image in \
+  docker.io/rancher/fleet-agent:v0.3.9 \
+  docker.io/rancher/fleet:v0.3.9 \
+  docker.io/rancher/gitjob:v0.1.26 \
+  docker.io/rancher/rancher-webhook:v0.2.5 \
+  docker.io/rancher/rancher:v2.6.6 \
+  docker.io/rancher/shell:v0.1.16 \
+  quay.io/jetstack/cert-manager-cainjector:v1.7.1 \
+  quay.io/jetstack/cert-manager-controller:v1.7.1 \
+  quay.io/jetstack/cert-manager-ctl:v1.7.1 \
+  quay.io/jetstack/cert-manager-webhook:v1.7.1 \
+;do
+  tarfile=$1/$(echo $image | cut -d/ -f3 | cut -d: -f1).tar
+  echo "pulling $image"
+  podman pull $image
+  echo "exporting $image to $tarfile"
+  podman save --format oci-archive -o $tarfile $image
+done

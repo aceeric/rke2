@@ -5,11 +5,11 @@
 
 set -e
 
-echo "confirming needed files exist"
+echo "$(date '+%Y-%m-%d %H:%M:%S.%3N') -- confirming needed files exist" | tee -a ~/rke2-install.log
 
 for f in rke2-images.linux-amd64.tar.zst rke2.linux-amd64.tar.gz sha256sum-amd64.txt install.sh; do
   if [[ ! -f /root/rke2-artifacts/$f ]]; then
-    echo "missing required file: /root/rke2-artifacts/$f"
+    echo "$(date '+%Y-%m-%d %H:%M:%S.%3N') -- missing required file: /root/rke2-artifacts/$f" | tee -a ~/rke2-install.log
     exit 1
   fi
 done
@@ -17,29 +17,29 @@ done
 # per https://docs.rke2.io/known_issues/#networkmanager
 
 if [[ ! -f /etc/NetworkManager/conf.d/rke2-canal.conf ]]; then
-  echo "creating /etc/NetworkManager/conf.d/rke2-canal.conf"
+  echo "$(date '+%Y-%m-%d %H:%M:%S.%3N') -- creating /etc/NetworkManager/conf.d/rke2-canal.conf" | tee -a ~/rke2-install.log
   cat <<EOF > /etc/NetworkManager/conf.d/rke2-canal.conf
 [keyfile]
 unmanaged-devices=interface-name:cali*;interface-name:flannel*
 EOF
 fi
 
-echo "restarting NetworkManager"
+echo "$(date '+%Y-%m-%d %H:%M:%S.%3N') -- restarting NetworkManager" | tee -a ~/rke2-install.log
 
 systemctl reload NetworkManager 
 
 # TODO SET PROPER FIREWALL RULES FOR NOW JUST DISABLE FIREWALLD
 
-echo "disabling firewalld"
+echo "$(date '+%Y-%m-%d %H:%M:%S.%3N') -- disabling firewalld" | tee -a ~/rke2-install.log
 
 systemctl stop firewalld && systemctl disable firewalld
 
 # Configs mandated by Kubernetes docs
 
-echo "configure socat"
+echo "$(date '+%Y-%m-%d %H:%M:%S.%3N') -- configure socat" | tee -a ~/rke2-install.log
 
 yum -y install socat conntrack ipset
 
-echo "disable swap"
+echo "$(date '+%Y-%m-%d %H:%M:%S.%3N') -- disable swap" | tee -a ~/rke2-install.log
 
 [[ -z "$(swapon --show)" ]] || { swapoff -a; sed -i '/ swap /d' /etc/fstab; }

@@ -1,19 +1,22 @@
 #!/usr/bin/env bash
 #
-# Installs an RKE2 worker node
-# Per: https://docs.rke2.io/install/quickstart/
+# Installs an RKE2 worker node. Per:
+#
+# https://docs.rke2.io/install/quickstart/
 #
 
 set -e
 
+echo "$(date '+%Y-%m-%d %H:%M:%S.%3N') -- start rke2 worker install" | tee -a ~/rke2-install.log
+
 if [[ "$#" -ne 2 ]]; then
-  echo "need RKE2 server IP address in arg 1, and RKE2 server token in arg 2"
+  echo "$(date '+%Y-%m-%d %H:%M:%S.%3N') -- need RKE2 server IP address in arg 1, and RKE2 server token in arg 2"
   exit 1
 fi
 
 /root/rke2-artifacts/install-rke2-common
 
-echo "creating /etc/rancher/rke2/config.yaml"
+echo "$(date '+%Y-%m-%d %H:%M:%S.%3N') -- creating /etc/rancher/rke2/config.yaml" | tee -a ~/rke2-install.log
 
 mkdir -p /etc/rancher/rke2 && cat <<EOF > /etc/rancher/rke2/config.yaml
 # v1.21.5 does not accept tls-san
@@ -23,17 +26,23 @@ server: https://$1:9345
 token: $2
 EOF
 
-echo "running RKE2 install script"
+echo "$(date '+%Y-%m-%d %H:%M:%S.%3N') -- running RKE2 install script" | tee -a ~/rke2-install.log
 
 export INSTALL_RKE2_TYPE="agent"
 export INSTALL_RKE2_ARTIFACT_PATH=/root/rke2-artifacts
 
 if sh /root/rke2-artifacts/install.sh; then
-  echo "enabling rke2-agent service"
+  echo "$(date '+%Y-%m-%d %H:%M:%S.%3N') -- enabling rke2-agent service" | tee -a ~/rke2-install.log
   systemctl enable rke2-agent.service && systemctl start rke2-agent.service
 else
-  echo "RKE2 install script failed"
+  echo "$(date '+%Y-%m-%d %H:%M:%S.%3N') -- RKE2 install script failed" | tee -a ~/rke2-install.log
   exit 1
 fi
 
-echo "Finished."
+echo "$(date '+%Y-%m-%d %H:%M:%S.%3N') -- configuring CLI tools" | tee -a ~/rke2-install.log
+
+cp /var/lib/rancher/rke2/bin/ctr /var/lib/rancher/rke2/bin/kubectl /var/lib/rancher/rke2/bin/crictl /usr/local/bin
+
+# assume ~/.kube/config was copied into the worker per 'scenarios/vbox-desktop/README.md'
+
+echo "$(date '+%Y-%m-%d %H:%M:%S.%3N') -- done installing rke2 worker" | tee -a ~/rke2-install.log

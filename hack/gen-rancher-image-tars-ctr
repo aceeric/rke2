@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+#
+# Exports the images from the containerd cache needed to install Rancher +
+# Cert Manager. The way to get the image list is:
+#
+# 1) Install RKE2
+# 2) Install Rancher / Cert-Manager
+# 3) Diff the containerd image cache between one and two. The list will be
+#    what you see below.
+#
+
+set -e
+
+if [[ -z "$1" ]]; then
+  echo "need a path to export to in arg 1"
+  exit 1
+fi
+
+for image in \
+  docker.io/rancher/fleet-agent:v0.3.9 \
+  docker.io/rancher/fleet:v0.3.9 \
+  docker.io/rancher/gitjob:v0.1.26 \
+  docker.io/rancher/rancher-webhook:v0.2.5 \
+  docker.io/rancher/rancher:v2.6.6 \
+  docker.io/rancher/shell:v0.1.16 \
+  quay.io/jetstack/cert-manager-cainjector:v1.7.1 \
+  quay.io/jetstack/cert-manager-controller:v1.7.1 \
+  quay.io/jetstack/cert-manager-ctl:v1.7.1 \
+  quay.io/jetstack/cert-manager-webhook:v1.7.1 \
+;do
+  tarfile=$1/$(echo $image | cut -d/ -f3 | cut -d: -f1).tar
+  echo "exporting $image to $tarfile"
+  ctr -n k8s.io -a /run/k3s/containerd/containerd.sock image export $tarfile $image
+done

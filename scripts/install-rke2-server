@@ -1,14 +1,21 @@
 #!/usr/bin/env bash
 #
-# Installs an RKE2 server node
+# Installs an RKE2 server node.
+#
 # Per: https://docs.rke2.io/install/quickstart/
+#
+# To un-install:
+#
+# /usr/local/bin/rke2-uninstall.sh
 #
 
 set -e
 
+echo "$(date '+%Y-%m-%d %H:%M:%S.%3N') -- start rke2 server install" | tee -a ~/rke2-install.log
+
 /root/rke2-artifacts/install-rke2-common
 
-echo "creating /etc/rancher/rke2/config.yaml"
+echo "$(date '+%Y-%m-%d %H:%M:%S.%3N') -- creating /etc/rancher/rke2/config.yaml" | tee -a ~/rke2-install.log
 
 # this has the effect of injecting the host IP address into the server cert SAN
 mkdir -p /etc/rancher/rke2 && cat <<EOF >/etc/rancher/rke2/config.yaml
@@ -16,19 +23,53 @@ tls-san:
 - $(hostname -i)
 EOF
 
-echo "running RKE2 install script"
+echo "$(date '+%Y-%m-%d %H:%M:%S.%3N') -- running RKE2 install script" | tee -a ~/rke2-install.log
 
 export INSTALL_RKE2_ARTIFACT_PATH=/root/rke2-artifacts
 
 if sh /root/rke2-artifacts/install.sh; then
-  echo "enabling rke2-server service"
+  echo "$(date '+%Y-%m-%d %H:%M:%S.%3N') -- enabling rke2-server service" | tee -a ~/rke2-install.log
   systemctl enable rke2-server.service && systemctl start rke2-server.service
 else
-  echo "RKE2 install script failed"
+  echo "$(date '+%Y-%m-%d %H:%M:%S.%3N') -- RKE2 install script failed" | tee -a ~/rke2-install.log
   exit 1
 fi
 
-echo "Finished. To access the RKE2 cluster from outside the VM:"
-echo "scp -i ssh/id_ed25519 root@$(hostname -i):/etc/rancher/rke2/rke2.yaml ~/.kube/rke2-config"
+echo "$(date '+%Y-%m-%d %H:%M:%S.%3N') -- configuring CLI tools" | tee -a ~/rke2-install.log
+
+cp /var/lib/rancher/rke2/bin/ctr /var/lib/rancher/rke2/bin/kubectl /var/lib/rancher/rke2/bin/crictl /usr/local/bin
+mkdir -p ~/.kube && cp /etc/rancher/rke2/rke2.yaml ~/.kube/config
+
+echo "$(date '+%Y-%m-%d %H:%M:%S.%3N') -- waiting for rke2 to be ready" | tee -a ~/rke2-install.log
+
+while true; do
+  if ! kubectl -n kube-system wait job --all --for condition=Complete --timeout=30s; then
+    sleep 2s
+    continue
+  fi
+  kubectl -nkube-system get ds,deploy -oname | while read -r unit; do
+    if ! kubectl -n kube-system rollout status $unit; then
+      sleep 2s
+      continue
+    fi
+  done
+  break
+done
+
+echo "$(date '+%Y-%m-%d %H:%M:%S.%3N') -- done installing rke2 server" | tee -a ~/rke2-install.log
+
+/root/rke2-artifacts/install-rke2-rancher
+
+echo
+echo "To access the RKE2 cluster from outside the VM using kubectl:"
+echo
+echo "export PRIVKEY=<path to the private key matching the public key in the VM>"
+echo "scp -i \$PRIVKEY root@$(hostname -i):/etc/rancher/rke2/rke2.yaml ~/.kube/rke2-config"
 echo "sed -i 's/127.0.0.1/"$(hostname -i)"/g' ~/.kube/rke2-config"
 echo "export KUBECONFIG=~/.kube/rke2-config"
+echo
+echo "To access the Rancher UI from you browser:"
+echo
+echo "Add an entry to your etc hosts: '$(hostname -i) $(hostname)' then access"
+echo "https://$(hostname) from your browser. Remember to disable all tracking"
+echo "protection in your browser first."

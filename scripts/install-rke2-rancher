@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+#
+# Install Rancher per https://rancher.com/docs/rancher/v2.6/en/installation/other-installation-methods/air-gap/install-rancher/
+#
+
+set -e
+
+echo "$(date '+%Y-%m-%d %H:%M:%S.%3N') -- confirming rancher helm artifacts" | tee -a ~/rke2-install.log
+
+for f in helm-v3.9.2-linux-386.tar.gz rancher-2.6.6.tgz cert-manager-v1.7.1.tgz cert-manager-crd.yaml; do
+  if [[ ! -f /root/rancher-artifacts/$f ]]; then
+    echo "$(date '+%Y-%m-%d %H:%M:%S.%3N') -- missing required rancher artifact: /root/rancher-artifacts/$f"
+    exit 1
+  fi
+done
+
+echo "$(date '+%Y-%m-%d %H:%M:%S.%3N') -- confirming rancher images" | tee -a ~/rke2-install.log
+
+for tar in \
+    cert-manager-cainjector.tar \
+    cert-manager-controller.tar \
+    cert-manager-ctl.tar \
+    cert-manager-webhook.tar \
+    fleet-agent.tar \
+    fleet.tar \
+    gitjob.tar \
+    rancher.tar \
+    rancher-webhook.tar \
+    shell.tar \
+  ;do \
+  if [[ ! -f /root/rancher-images/$tar ]]; then
+    echo "$(date '+%Y-%m-%d %H:%M:%S.%3N') -- missing required rke2 file: $f"
+    exit 1
+  fi
+done
+
+echo "$(date '+%Y-%m-%d %H:%M:%S.%3N') -- installing Helm" | tee -a ~/rke2-install.log
+
+tar -zxvf /root/rancher-artifacts/helm-v3.9.2-linux-386.tar.gz -C /tmp
+sudo mv /tmp/linux-386/helm /usr/local/bin/helm
+rm -rf /tmp/linux-386
+
+echo "$(date '+%Y-%m-%d %H:%M:%S.%3N') -- generating cert manager templates" | tee -a ~/rke2-install.log
+
+cd /root/rancher-artifacts
+
+helm template cert-manager ./cert-manager-v1.7.1.tgz --output-dir . \
+    --namespace cert-manager
+cp -f cert-manager-crd.yaml ./cert-manager/
+
+echo "$(date '+%Y-%m-%d %H:%M:%S.%3N') -- generating rancher templates" | tee -a ~/rke2-install.log
+
+helm template rancher ./rancher-2.6.6.tgz \
+  --output-dir . \
+  --validate \
+  --no-hooks \
+  --namespace cattle-system \
+  --set replicas=1 \
+  --set bootstrapPassword=admin \
+  --set hostname=$(hostname) \
+  --set certmanager.version=1.7.1 \
+  --set useBundledSystemChart=true
+
+echo "$(date '+%Y-%m-%d %H:%M:%S.%3N') -- populating containerd image cache with rancher images" | tee -a ~/rke2-install.log
+
+find /root/rancher-images -name '*.tar' | while read -r tarfile; do
+  echo "importing $image"
+  ctr -n k8s.io -a /run/k3s/containerd/containerd.sock image import $tarfile
+done
+
+echo "$(date '+%Y-%m-%d %H:%M:%S.%3N') -- installing cert manager" | tee -a ~/rke2-install.log
+
+kubectl create namespace cert-manager
+kubectl apply -f cert-manager/cert-manager-crd.yaml
+kubectl apply -R -f ./cert-manager
+
+kubectl -n cert-manager wait job.batch/cert-manager-startupapicheck --for condition=Complete --timeout=600s
+kubectl -n cert-manager wait deploy --all --for condition=Available --timeout=600s
+
+echo "$(date '+%Y-%m-%d %H:%M:%S.%3N') -- installing rancher" | tee -a ~/rke2-install.log
+
+kubectl create namespace cattle-system
+
+echo "$(date '+%Y-%m-%d %H:%M:%S.%3N') -- creating bootstrap-secret" | tee -a ~/rke2-install.log
+
+# templating doesn't create the bootstrap password secret so - generate it manually
+kubectl -n cattle-system create secret generic bootstrap-secret --from-literal=bootstrapPassword=admin
+
+echo "$(date '+%Y-%m-%d %H:%M:%S.%3N') -- installing rancher" | tee -a ~/rke2-install.log
+
+kubectl -n cattle-system apply -R -f ./rancher
+
+echo "$(date '+%Y-%m-%d %H:%M:%S.%3N') -- waiting for rancher" | tee -a ~/rke2-install.log
+
+while true; do
+  kubectl -n cattle-system get deploy -oname | while read -r unit; do
+    if ! kubectl -n kube-system rollout status $unit --timeout 30s; then
+      sleep 2s
+      continue
+    fi
+  done
+  break
+done
+
+echo "$(date '+%Y-%m-%d %H:%M:%S.%3N') -- done installing rancher" | tee -a ~/rke2-install.log
