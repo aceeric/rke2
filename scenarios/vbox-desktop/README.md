@@ -87,21 +87,21 @@ done
 You now have three Virtual Box VMs running named `rke1`, `rke2`, and `rke3`. Get the IP addresses for the VMs:
 
 ```
-$ for host in rke1 rke2 rke3; do echo export $host=$(xec get-vm-ip $host); done
+$ for host in rke1 rke2 rke3; do echo export $host=$(scripts/helpers/get-vm-ip $host); done
 export rke1=192.168.0.31
 export rke2=192.168.0.32
 export rke3=192.168.0.33
 ```
 
-Finally: when you generate a VM using _Desktop Kubernetes_ it creates an ed25519 SSH key pair and places the public key into each VM and the private key in `~/projects/desktop-kubernetes/generated/kickstart/id_ed25519`. You need that SSH key to access the VMs here. So create an environment variable to make the ssh command simpler:
+# In this (rke2) Project
+
+From here forward, the instructions assume you've git cloned https://github.com/aceeric/rke2 and the repo is your current working directory. E.g. `cd ~/projects/rke2`.
+
+Above when you generated a VM using _Desktop Kubernetes_ it created an ed25519 SSH key pair and places the public key into each VM and the private key in `~/projects/desktop-kubernetes/generated/kickstart/id_ed25519`. You need that SSH key to access the VMs here. So create an environment variable to make the ssh command simpler:
 
 ```
 export PRIVKEY=~/projects/desktop-kubernetes/generated/kickstart/id_ed25519
 ```
-
-# In this (rke2) Project
-
-From here forward, the instructions assume you've git cloned https://github.com/aceeric/rke2 and the repo is your current working directory. E.g. `cd ~/projects/rke2`.
 
 Set environment variables for the VMs using the values above
 
