@@ -127,7 +127,7 @@ scp -i $PRIVKEY rancher-images/* root@$rke1:/root/rancher-images
 ### Run the RKE2 installer to install the control plane and Rancher
 
 ```
-ssh -i $PRIVKEY root@$rke1 "/root/rke2-artifacts/install-rke2-server"
+ssh -i $PRIVKEY root@$rke1 /root/rke2-artifacts/install-rke2-server
 ```
 
 If success you should see this:
@@ -135,16 +135,16 @@ If success you should see this:
 ```
 To access the RKE2 cluster from outside the VM using kubectl:
 
-export PRIVKEY=<path to the private key matching the public key in the VM>"
+export PRIVKEY=<path to the private key matching the public key in the VM>
 scp -i $PRIVKEY root@192.168.0.31:/etc/rancher/rke2/rke2.yaml ~/.kube/rke2-config
 sed -i 's/127.0.0.1/192.168.0.31/g' ~/.kube/rke2-config
-export KUBECONFIG=~/.kube/rke2-config"
+export KUBECONFIG=~/.kube/rke2-config
 
-To access the Rancher UI from you browser:"
+To access the Rancher UI from you browser:
 
-Add an entry to your etc hosts: '192.168.0.31 rke1' then access"
-https://rke1 from your browser. Remember to disable all tracking"
-protection in your browser first."
+Add an entry to your etc hosts: '192.168.0.31 rke1' then access
+https://rke1 from your browser. Remember to disable all tracking
+protection in your browser first.
 ```
 
 On my system, which has the following CPU config - Intel i7-8700 CPU @ 3.20GHz x 12 - generating the RKE2 server with Rancher in the VM takes about five minutes.
